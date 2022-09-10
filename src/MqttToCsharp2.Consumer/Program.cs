@@ -26,7 +26,8 @@ Devices.PcRoomRemote.StateChanged += async s =>
 		await Devices.PowerSwitch1.SetAsync(new() { State = OnOffToggle.Off });
 };
 
-await Devices.PowerSwitch1.SetAsync(new() { State = (await Devices.PcRoomLight.GetAsync()).State });
+var pcRoomLightCurrentState = Devices.PcRoomLight.LastState ?? (await Devices.PcRoomLight.GetAsync());
+await Devices.PowerSwitch1.SetAsync(new() { State = pcRoomLightCurrentState.State });
 Devices.PowerSwitch1.StateChanged += async s =>
 {
 	if (s.State.HasValue)

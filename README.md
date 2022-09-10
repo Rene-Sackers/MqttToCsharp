@@ -32,8 +32,11 @@ Devices.PcRoomRemote.StateChanged += async s =>
 ```
 
 ```csharp
+// Get PcRoomLight's current state (.LastState is cached from the last time it changed, if it's null, request the current state)
+var pcRoomLightCurrentState = Devices.PcRoomLight.LastState ?? (await Devices.PcRoomLight.GetAsync());
+
 // Set PowerSwitch1 state to PcRoomLight's state (sync on/off)
-await Devices.PowerSwitch1.SetAsync(new() { State = (await Devices.PcRoomLight.GetAsync()).State });
+await Devices.PowerSwitch1.SetAsync(new() { State = pcRoomLightCurrentState.State });
 
 // When PowerSwitch1 turns on or off, set PcRoomLight's state to the same value
 Devices.PowerSwitch1.StateChanged += async s =>
