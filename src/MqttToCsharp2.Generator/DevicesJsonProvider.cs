@@ -6,12 +6,12 @@ namespace MqttToCsharp2.Generator;
 
 public static class DevicesJsonProvider
 {
-	public static async Task<string> GetDevicesJson(string mqttServerIp)
+	public static Task<string> GetDevicesJson(string mqttServeIp)
+		=> GetDevicesJson(new MqttClientOptionsBuilder().WithTcpServer(mqttServeIp).Build());
+	
+	public static async Task<string> GetDevicesJson(MqttClientOptions options)
 	{
 		var factory = new MqttFactory();
-		var options = new MqttClientOptionsBuilder()
-			.WithTcpServer(mqttServerIp)
-			.Build();
 
 		using var client = factory.CreateMqttClient();
 		var tcs = new TaskCompletionSource<string>();
