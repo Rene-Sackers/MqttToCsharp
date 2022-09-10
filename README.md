@@ -6,7 +6,7 @@ At the moment it's more of an experiment. Not intended for actual use.
 
 `MqttToCsharp2.Generator` connects to the MQTT server and listens to the `zigbee2mqtt/bridge/devices` topic. This topic returns a JSON file with all devices known to z2m.
 
-It parses these device and determines their names, input and ouput proprties and actions.
+It parses these devices and determines their names, input and ouput proprties and actions.
 
 It then generates a C# boilerplate that defines each device and their properties, and puts the code into `Code.cs` in `MqttToCsharp2.Generated`.
 
