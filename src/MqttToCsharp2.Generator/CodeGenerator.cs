@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using MqttToCsharp2.Generator.ExtensionMethods;
 using MqttToCsharp2.Generator.Models;
 
 namespace MqttToCsharp2.Generator;
@@ -49,12 +50,6 @@ public static class Devices
 		await client.SubscribeAsync(""zigbee2mqtt/#"");
 	}}
 
-	private static void CreateDevices(IMqttClient client)
-	{{
-		AllDevicesPrivate.Add(PcRoomLight = new(client));
-		AllDevicesPrivate.Add(PowerSwitch1 = new(client));
-	}}
-
 	private static Task HandleMessage(MqttApplicationMessageReceivedEventArgs e)
 	{{
 		var deviceName = e.ApplicationMessage.Topic[""zigbee2mqtt/"".Length..];
@@ -67,19 +62,36 @@ public static class Devices
 		
 		return Task.CompletedTask;
 	}}
+
+	{GenerateCreateDevices(_devices).Indent(1)}
+	{GenerateDeviceProperties(_devices).Indent(1)}
 }}");
+
+		codeStringBuilder.AppendLine("}\n");
 		
 		DeclareIDevice(codeStringBuilder);
-
-		foreach (var device in _devices)
-		{
-			codeStringBuilder.AppendLine($"public static {device.SanitizedName} {device.SanitizedName} {{ get; private set; }}");
-		}
-
 
 		_devices.ForEach(d => GenerateDeviceClass(codeStringBuilder, d));
 
 		return codeStringBuilder.ToString();
+	}
+
+	private static string GenerateCreateDevices(IEnumerable<Device> devices)
+	{
+		var stringBuilder = new StringBuilder();
+		stringBuilder.AppendLine("private static void CreateDevices(IMqttClient client)\n{");
+		devices.ToList().ForEach(d => stringBuilder.AppendLine($"\tAllDevicesPrivate.Add({d.SanitizedName} = new(client));"));
+		stringBuilder.AppendLine("}");
+		return stringBuilder.ToString();
+	}
+
+	private static string GenerateDeviceProperties(IEnumerable<Device> devices)
+	{
+		var sb = new StringBuilder();
+		foreach (var device in devices)
+			sb.AppendLine($"public static {device.SanitizedName} {device.SanitizedName} {{ get; private set; }}");
+
+		return sb.ToString();
 	}
 
 	private static void DeclareIDevice(StringBuilder stringBuilder)
@@ -89,8 +101,7 @@ public static class Devices
 	public string IeeeAddress { get; }
 	public string FriendlyName { get; }
 	internal void TriggerStateChanged(string payloadJson);
-}
-");
+}");
 	}
 
 	private static void GenerateDeviceClass(StringBuilder stringBuilder, Device device)
@@ -100,13 +111,13 @@ public class {device.SanitizedName} : IDevice {{
 	public string IeeeAddress => ""{device.IeeeAddress}"";
 	public string FriendlyName => ""{device.Name}"";
 
-	public delegate void StateChangedEventHandler(DeviceSetState state);
+	public delegate void StateChangedEventHandler(DeviceReadState state);
 
 	public event StateChangedEventHandler StateChanged;
 
 	private readonly IMqttClient _client;
 
-	public PcRoomLight(IMqttClient client)
+	public {device.SanitizedName}(IMqttClient client)
 	{{
 		_client = client;
 	}}
@@ -128,10 +139,10 @@ public class {device.SanitizedName} : IDevice {{
 	
 	void IDevice.TriggerStateChanged(string payloadJson)
 	{{
-		DeviceSetState state;
+		DeviceReadState state;
 		try
 		{{
-			state = JsonConvert.DeserializeObject<DeviceSetState>(payloadJson);
+			state = JsonConvert.DeserializeObject<DeviceReadState>(payloadJson);
 		}}
 		catch (Exception e)
 		{{
@@ -144,6 +155,20 @@ public class {device.SanitizedName} : IDevice {{
 		
 		StateChanged?.Invoke(state);
 	}}
+
+	public class DeviceSetState
+	{{
+	}}
+
+
+	public class DeviceReadState
+	{{
+	}}
 }}");
+	}
+
+	private static void GenerateDeviceSetState(TabbedStringBuilder stringBuilder, Device device)
+	{
+		
 	}
 }

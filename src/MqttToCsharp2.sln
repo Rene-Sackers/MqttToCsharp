@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttToCsharp2.Generator", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttToCsharp2.ScriptHost", "MqttToCsharp2.ScriptHost\MqttToCsharp2.ScriptHost.csproj", "{4619B547-EA87-42D8-BC25-A62089E5B440}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttToCsharp2.Generated", "MqttToCsharp2.Generated\MqttToCsharp2.Generated.csproj", "{7F64D1CE-6FD0-47CD-BFD8-3E6CCF7E80EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{4619B547-EA87-42D8-BC25-A62089E5B440}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4619B547-EA87-42D8-BC25-A62089E5B440}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4619B547-EA87-42D8-BC25-A62089E5B440}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F64D1CE-6FD0-47CD-BFD8-3E6CCF7E80EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F64D1CE-6FD0-47CD-BFD8-3E6CCF7E80EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F64D1CE-6FD0-47CD-BFD8-3E6CCF7E80EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F64D1CE-6FD0-47CD-BFD8-3E6CCF7E80EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

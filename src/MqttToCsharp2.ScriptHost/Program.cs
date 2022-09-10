@@ -7,30 +7,27 @@ using Newtonsoft.Json.Converters;
 
 await Devices.InitializeAsync();
 
-// await Devices.PcRoomLight.SetStateOnAsync();
-// await Task.Delay(2000);
-// await Devices.PcRoomLight.SetStateOffAsync();
-// Devices.PcRoomLight.StateChanged += async s =>
-// {
-// 	switch (s.State)
-// 	{
-// 		case PcRoomLight.DeviceSetState.StateEnum.On:
-// 			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.On });
-// 			break;
-// 		case PcRoomLight.DeviceSetState.StateEnum.Off:
-// 			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.Off });
-// 			break;
-// 	}
-// 	
-// 	if (s.State != PcRoomLight.DeviceSetState.StateEnum.On)
-// 		return;
-// 	
-// 	await Task.Delay(5000);
-// 	await Devices.PcRoomLight.SetAsync(new()
-// 	{
-// 		State = PcRoomLight.DeviceSetState.StateEnum.Off
-// 	});
-// };
+Devices.PcRoomLight.StateChanged += async s =>
+{
+	switch (s.State)
+	{
+		case PcRoomLight.DeviceReadState.StateEnum.On:
+			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.On });
+			break;
+		case PcRoomLight.DeviceReadState.StateEnum.Off:
+			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.Off });
+			break;
+	}
+	
+	if (s.State != PcRoomLight.DeviceReadState.StateEnum.On)
+		return;
+	
+	await Task.Delay(5000);
+	await Devices.PcRoomLight.SetAsync(new()
+	{
+		State = PcRoomLight.DeviceSetState.StateEnum.Off
+	});
+};
 
 // await Devices.PcRoomLight.SetAsync(new()
 // {
@@ -103,7 +100,7 @@ public class PcRoomLight : IDevice
 	public string IeeeAddress => "0x60a423fffef1a847";
 	public string FriendlyName => "pc-room-light";
 
-	public delegate void StateChangedEventHandler(DeviceSetState state);
+	public delegate void StateChangedEventHandler(DeviceReadState state);
 
 	public event StateChangedEventHandler StateChanged;
 
@@ -131,10 +128,10 @@ public class PcRoomLight : IDevice
 	
 	void IDevice.TriggerStateChanged(string payloadJson)
 	{
-		DeviceSetState state;
+		DeviceReadState state;
 		try
 		{
-			state = JsonConvert.DeserializeObject<DeviceSetState>(payloadJson);
+			state = JsonConvert.DeserializeObject<DeviceReadState>(payloadJson);
 		}
 		catch (Exception e)
 		{
@@ -240,7 +237,7 @@ public class PowerSwitch1 : IDevice
 	public string IeeeAddress => "0xbc33acfffe4e7084";
 	public string FriendlyName => "power-switch-1";
 
-	public delegate void StateChangedEventHandler(DeviceSetState state);
+	public delegate void StateChangedEventHandler(DeviceReadState state);
 
 	public event StateChangedEventHandler StateChanged;
 
@@ -268,10 +265,10 @@ public class PowerSwitch1 : IDevice
 	
 	void IDevice.TriggerStateChanged(string payloadJson)
 	{
-		DeviceSetState state;
+		DeviceReadState state;
 		try
 		{
-			state = JsonConvert.DeserializeObject<DeviceSetState>(payloadJson);
+			state = JsonConvert.DeserializeObject<DeviceReadState>(payloadJson);
 		}
 		catch (Exception e)
 		{
