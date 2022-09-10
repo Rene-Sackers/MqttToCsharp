@@ -9,6 +9,7 @@ public class CodeGenerator
 	private readonly List<Device> _devices;
 	
 	private Dictionary<EnumProperty, string> _enumMap;
+	private Dictionary<CompositeProperty, string> _compositeMap;
 
 	public CodeGenerator(List<Device> devices)
 	{
@@ -18,6 +19,7 @@ public class CodeGenerator
 	public string Generate(string @namespace)
 	{
 		_enumMap = new();
+		_compositeMap = new();
 		
 		return @$"
 using System.Runtime.Serialization;
@@ -111,8 +113,14 @@ public enum OnOffToggle
 	Toggle,
 }
 ");
-		
-		// Does not account for composite types.
+		stringBuilder.AppendLine(DeclareEnums());
+		stringBuilder.AppendLine(DeclareCompositeClasses());
+
+		return stringBuilder.ToString();
+	}
+
+	private string DeclareEnums()
+	{
 		var allDevicesproperties = _devices.OrderBy(d => d.IeeeAddress)
 			.SelectMany(d => d.Actions)
 			.Concat(_devices.SelectMany(d => d.OutputValues))
@@ -141,7 +149,8 @@ public enum OnOffToggle
 			})
 			.OrderBy(e => e.Name);
 		
-		var declaredEnumNames = new List<string>();
+		var stringBuilder = new StringBuilder();
+		var declaredNames = new List<string>();
 		foreach (var uniqueEnum in uniqueEnums)
 		{
 			string enumName = null;
@@ -149,16 +158,71 @@ public enum OnOffToggle
 			{
 				enumName = i == 0 ? uniqueEnum.Name : uniqueEnum.Name + i;
 				
-				if (!declaredEnumNames.Contains(enumName))
+				if (!declaredNames.Contains(enumName))
 					break;
 			}
 
 			if (enumName == null)
 				throw new InvalidOperationException("Could not generate a unique name for enum after 10 attempts: " + uniqueEnum.Name);
 
-			declaredEnumNames.Add(enumName);
+			declaredNames.Add(enumName);
 			stringBuilder.AppendLine(GenerateEnum(enumName, uniqueEnum.Values));
 			uniqueEnum.Properties.ForEach(p => _enumMap.Add(p, enumName));
+		}
+
+		return stringBuilder.ToString();
+	}
+
+	private string DeclareCompositeClasses()
+	{
+		var allDevicesproperties = _devices.OrderBy(d => d.IeeeAddress)
+			.SelectMany(d => d.Actions)
+			.Concat(_devices.SelectMany(d => d.OutputValues))
+			.Concat(_devices.SelectMany(d => d.SettableValues))
+			.Distinct()
+			.ToList();
+
+		// Only accounts for 1 level deep composite properties. Are they recursive?
+		allDevicesproperties.AddRange(allDevicesproperties
+			.OfType<CompositeProperty>()
+			.SelectMany(p => p.Properties)
+			.ToList());
+
+		var uniqueComposites = allDevicesproperties
+			.OfType<CompositeProperty>()
+			.Select(p => new
+			{
+				Property = p,
+				ConcatValues = string.Join(",", p.Properties.OrderBy(v => v.Name).Select(p2 => $"{p2.Name}:{p2.Type}"))
+			})
+			.GroupBy(eg => eg.ConcatValues)
+			.Select(g => new
+			{
+				Name = g.First().Property.Name.SanitizeFunctionName(),
+				CompositeProperties = g.First().Property.Properties,
+				Properties = g.Select(x => x.Property).ToList()
+			})
+			.OrderBy(e => e.Name);
+		
+		var stringBuilder = new StringBuilder();
+		var declaredNames = new List<string>();
+		foreach (var uniqueComposite in uniqueComposites)
+		{
+			string compositeName = null;
+			for (var i = 0; i <= 10; i++)
+			{
+				compositeName = i == 0 ? uniqueComposite.Name : uniqueComposite.Name + i;
+				
+				if (!declaredNames.Contains(compositeName))
+					break;
+			}
+
+			if (compositeName == null)
+				throw new InvalidOperationException("Could not generate a composite name for composite type after 10 attempts: " + uniqueComposite.Name);
+
+			declaredNames.Add(compositeName);
+			stringBuilder.AppendLine(GenerateCompositePropertyClass(compositeName, uniqueComposite.CompositeProperties));
+			uniqueComposite.Properties.ForEach(p => _compositeMap.Add(p, compositeName));
 		}
 
 		return stringBuilder.ToString();
@@ -278,12 +342,16 @@ public class DeviceSetState
 				stringBuilder.AppendLine($"public OnOffToggle? {sanitizedName} {{ get; set; }}");
 				return stringBuilder.ToString();
 			case CompositeProperty compositeProperty:
-				var className = sanitizedName + "Composite";
-				stringBuilder.AppendLine($"public {className} {sanitizedName} {{ get; set; }}\n");
-				stringBuilder.Append(GenerateCompositePropertyClass(className, compositeProperty.Properties));
+				if (!_compositeMap.ContainsKey(compositeProperty))
+					return null;
+				
+				stringBuilder.AppendLine($"public {_compositeMap[compositeProperty]} {sanitizedName} {{ get; set; }}");
 				return stringBuilder.ToString();
 			case EnumProperty enumProperty:
-				stringBuilder.AppendLine($"public {_enumMap[enumProperty]}? {sanitizedName} {{ get; set; }}\n");
+				if (!_enumMap.ContainsKey(enumProperty))
+					return null;
+				
+				stringBuilder.AppendLine($"public {_enumMap[enumProperty]}? {sanitizedName} {{ get; set; }}");
 				return stringBuilder.ToString();
 			default:
 				Console.WriteLine("Unknown device property type: " + deviceProperty.GetType().Name);

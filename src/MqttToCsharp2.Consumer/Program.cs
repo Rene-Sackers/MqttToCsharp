@@ -2,21 +2,21 @@
 
 await Devices.InitializeAsync();
 
-var motionSensor = Devices.X0xec1bbdfffea80880;
+var motionSensor = Devices.HallwayMotion;
 var light = Devices.PcRoomLight;
 
-light.StateChanged += async s =>
-{
-	switch (s.State)
-	{
-		case OnOffToggle.On:
-			await Devices.PowerSwitch1.SetAsync(new() { State = OnOffToggle.On });
-			break;
-		case OnOffToggle.Off:
-			await Devices.PowerSwitch1.SetAsync(new() { State = OnOffToggle.Off });
-			break;
-	}
-};
+// light.StateChanged += async s =>
+// {
+// 	switch (s.State)
+// 	{
+// 		case OnOffToggle.On:
+// 			await Devices.PowerSwitch1.SetAsync(new() { State = OnOffToggle.On });
+// 			break;
+// 		case OnOffToggle.Off:
+// 			await Devices.PowerSwitch1.SetAsync(new() { State = OnOffToggle.Off });
+// 			break;
+// 	}
+// };
 
 Devices.PcRoomRemote.StateChanged += async s =>
 {
@@ -24,10 +24,11 @@ Devices.PcRoomRemote.StateChanged += async s =>
 		Console.WriteLine("Action: " + s.Action);
 };
 
+await Devices.PowerSwitch1.SetAsync(new() { State = (await Devices.PcRoomLight.GetAsync()).State });
 Devices.PowerSwitch1.StateChanged += async s =>
 {
 	if (s.State.HasValue)
-		await light.SetAsync(new() { State = s.State });
+		await Devices.PcRoomLight.SetAsync(new() { State = s.State });
 };
 
 Console.WriteLine("Light is currently: " + (await light.GetAsync()).State);
