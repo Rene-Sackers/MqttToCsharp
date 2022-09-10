@@ -20,7 +20,7 @@ await File.WriteAllTextAsync(Path.Combine(outputDir, "parsed-devices.json"), Jso
 
 Console.WriteLine("Generating code");
 var generator = new CodeGenerator(devices);
-const string @namespace = "MqttClient";
+const string @namespace = "MqttToCsharp";
 var code = generator.Generate(@namespace);
 
 await File.WriteAllTextAsync(Path.Combine(outputDir, "Code.cs"), code);

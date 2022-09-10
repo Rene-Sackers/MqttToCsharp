@@ -7,27 +7,29 @@ using Newtonsoft.Json.Converters;
 
 await Devices.InitializeAsync();
 
-Devices.PcRoomLight.StateChanged += async s =>
-{
-	switch (s.State)
-	{
-		case PcRoomLight.DeviceReadState.StateEnum.On:
-			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.On });
-			break;
-		case PcRoomLight.DeviceReadState.StateEnum.Off:
-			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.Off });
-			break;
-	}
-	
-	if (s.State != PcRoomLight.DeviceReadState.StateEnum.On)
-		return;
-	
-	await Task.Delay(5000);
-	await Devices.PcRoomLight.SetAsync(new()
-	{
-		State = PcRoomLight.DeviceSetState.StateEnum.Off
-	});
-};
+var state = await Devices.PcRoomLight.GetAsync();
+
+// Devices.PcRoomLight.StateChanged += async s =>
+// {
+// 	switch (s.State)
+// 	{
+// 		case PcRoomLight.DeviceReadState.StateEnum.On:
+// 			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.On });
+// 			break;
+// 		case PcRoomLight.DeviceReadState.StateEnum.Off:
+// 			await Devices.PowerSwitch1.SetAsync(new() { State = PowerSwitch1.DeviceSetState.StateEnum.Off });
+// 			break;
+// 	}
+// 	
+// 	if (s.State != PcRoomLight.DeviceReadState.StateEnum.On)
+// 		return;
+// 	
+// 	await Task.Delay(5000);
+// 	await Devices.PcRoomLight.SetAsync(new()
+// 	{
+// 		State = PcRoomLight.DeviceSetState.StateEnum.Off
+// 	});
+// };
 
 // await Devices.PcRoomLight.SetAsync(new()
 // {
@@ -99,6 +101,8 @@ public class PcRoomLight : IDevice
 {
 	public string IeeeAddress => "0x60a423fffef1a847";
 	public string FriendlyName => "pc-room-light";
+	
+	public DeviceReadState LastState { get; private set; }
 
 	public delegate void StateChangedEventHandler(DeviceReadState state);
 
@@ -125,6 +129,24 @@ public class PcRoomLight : IDevice
 
 		await _client.PublishAsync(message);
 	}
+
+	private TaskCompletionSource GetStateTcs;
+
+	public async Task<DeviceReadState> GetAsync()
+	{
+		var json = JsonConvert.SerializeObject(new DeviceReadState());
+
+		var message = new MqttApplicationMessageBuilder()
+			.WithTopic($"zigbee2mqtt/{IeeeAddress}/get")
+			.WithPayload(json)
+			.Build();
+
+		GetStateTcs = new();
+		await _client.PublishAsync(message);
+
+		var waitResult = await Task.WhenAny(GetStateTcs.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+		return waitResult == GetStateTcs.Task ? LastState : null;
+	}
 	
 	void IDevice.TriggerStateChanged(string payloadJson)
 	{
@@ -142,6 +164,9 @@ public class PcRoomLight : IDevice
 		if (state == null)
 			return;
 		
+		LastState = state;
+		
+		GetStateTcs?.TrySetResult();
 		StateChanged?.Invoke(state);
 	}
 

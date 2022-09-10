@@ -39,25 +39,42 @@ public static class DevicesFactory
 		if (properties == null)
 			return device;
 
+		var parsedProperties = new List<DeviceProperty>();
 		foreach (var property in properties)
 		{
 			var features = property.Value<JArray>("features");
 			if (features == null)
 			{
-				ParseProperty(device, property);
+				parsedProperties.Add(ParseProperty(property));
 				continue;
 			}
 
 			foreach (var feature in features)
 			{
-				ParseProperty(device, feature);
+				parsedProperties.Add(ParseProperty(feature));
+			}
+		}
+
+		foreach (var parsedProperty in parsedProperties.Where(p => p != null))
+		{
+			switch (parsedProperty.Access)
+			{
+				case 1: // readonly?
+					device.OutputValues.Add(parsedProperty);
+					break;
+				case 2: // trigger an event/action on the device?
+					device.Actions.Add(parsedProperty);
+					break;
+				case 7: // settable value?
+					device.SettableValues.Add(parsedProperty);
+					break;
 			}
 		}
 
 		return device;
 	}
 
-	private static void ParseProperty(Device device, JToken propertyJson)
+	private static DeviceProperty ParseProperty(JToken propertyJson)
 	{
 		var type = propertyJson.Value<string>("type");
 		var description = propertyJson.Value<string>("description");
@@ -72,7 +89,23 @@ public static class DevicesFactory
 				var offValue = propertyJson.Value<string>("value_off");
 				var toggleValue = propertyJson.Value<string>("value_toggle");
 
-				var enumValue = new EnumValue { Values = new() };
+				var isTrueFalseBoolean = onValue == bool.TrueString && offValue == bool.FalseString && toggleValue == null;
+
+				if (isTrueFalseBoolean)
+				{
+					deviceProperty = new BooleanProperty();
+					break;
+				}
+				
+				var isTrueFalseToggle = onValue == "ON" && offValue == "OFF" && toggleValue == "TOGGLE";
+
+				if (isTrueFalseToggle)
+				{
+					deviceProperty = new OnOffToggleProperty();
+					break;
+				}
+
+				var enumValue = new EnumProperty { Values = new() };
 
 				if (!string.IsNullOrWhiteSpace(onValue))
 					enumValue.Values.Add(onValue);
@@ -86,38 +119,43 @@ public static class DevicesFactory
 				deviceProperty = enumValue;
 				break;
 			case "numeric":
-				deviceProperty = new NumericValue
+				deviceProperty = new NumericProperty
 				{
-					MinValue = propertyJson.Value<long>("value_min"),
-					MaxValue = propertyJson.Value<long>("value_max")
+					MinValue = propertyJson.Value<long?>("value_min"),
+					MaxValue = propertyJson.Value<long?>("value_max")
 				};
 				break;
 			case "enum":
-				deviceProperty = new EnumValue
+				deviceProperty = new EnumProperty
 				{
 					Values = propertyJson.Value<JArray>("values")?.Select(a => a.Value<string>()).ToList()
 				};
 				break;
+			case "composite":
+				var compositeFeatures = propertyJson.Value<JArray>("features");
+				if (compositeFeatures == null)
+				{
+					Console.WriteLine($"Composite property \"{name}\" has no features entry");
+					return null;
+				}
+
+				var compositeProperty = new CompositeProperty
+				{
+					Properties = compositeFeatures.Select(ParseProperty).Where(p => p != null).ToList()
+				};
+				deviceProperty = compositeProperty;
+				access = compositeProperty.Properties.Max(p => p.Access);
+				break;
 			default:
 				Console.WriteLine("Unknown expose type: " + type);
-				return;
+				return null;
 		}
 
 		deviceProperty.Name = name;
 		deviceProperty.Description = description;
 		deviceProperty.Type = type;
+		deviceProperty.Access = access;
 
-		switch (access)
-		{
-			case 1: // readonly?
-				device.OutputValues.Add(deviceProperty);
-				break;
-			case 2: // trigger an event/action on the device?
-				device.Actions.Add(deviceProperty);
-				break;
-			case 7: // settable value?
-				device.SettableValues.Add(deviceProperty);
-				break;
-		}
+		return deviceProperty;
 	}
 }
