@@ -16,9 +16,8 @@ public class CodeGenerator
 
 	public string Generate(string @namespace)
 	{
-		var codeStringBuilder = new StringBuilder();
-
-		codeStringBuilder.AppendLine(@$"using System.Runtime.Serialization;
+		return @$"
+using System.Runtime.Serialization;
 using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
@@ -65,15 +64,9 @@ public static class Devices
 
 	{GenerateCreateDevices(_devices).Indent(1)}
 	{GenerateDeviceProperties(_devices).Indent(1)}
-}}");
-
-		codeStringBuilder.AppendLine("}\n");
-		
-		DeclareIDevice(codeStringBuilder);
-
-		_devices.ForEach(d => GenerateDeviceClass(codeStringBuilder, d));
-
-		return codeStringBuilder.ToString();
+}}
+{DeclareIDevice()}
+{_devices.Select(GenerateDeviceClass).ConcatStrings()}";
 	}
 
 	private static string GenerateCreateDevices(IEnumerable<Device> devices)
@@ -94,19 +87,20 @@ public static class Devices
 		return sb.ToString();
 	}
 
-	private static void DeclareIDevice(StringBuilder stringBuilder)
+	private static string DeclareIDevice()
 	{
-		stringBuilder.AppendLine(@"public interface IDevice
+		return @"
+public interface IDevice
 {
 	public string IeeeAddress { get; }
 	public string FriendlyName { get; }
 	internal void TriggerStateChanged(string payloadJson);
-}");
+}";
 	}
 
-	private static void GenerateDeviceClass(StringBuilder stringBuilder, Device device)
+	private static string GenerateDeviceClass(Device device)
 	{
-		stringBuilder.AppendLine($@"
+		return $@"
 public class {device.SanitizedName} : IDevice {{
 	public string IeeeAddress => ""{device.IeeeAddress}"";
 	public string FriendlyName => ""{device.Name}"";
@@ -155,20 +149,78 @@ public class {device.SanitizedName} : IDevice {{
 		
 		StateChanged?.Invoke(state);
 	}}
-
-	public class DeviceSetState
-	{{
-	}}
-
-
-	public class DeviceReadState
-	{{
-	}}
-}}");
+	{GenerateDeviceSetState(device).Indent(1)}
+	{GenerateDeviceReadState(device).Indent(1)}
+}}";
 	}
 
-	private static void GenerateDeviceSetState(TabbedStringBuilder stringBuilder, Device device)
+	private static string GenerateDeviceSetState(Device device)
 	{
+		return $@"
+public class DeviceSetState
+{{
+	{device.SettableValues.Concat(device.Actions).Select(DevicePropertyToClassProperty).ConcatStrings().Indent(1)}
+}}";
+	}
+
+	private static string DevicePropertyToClassProperty(DeviceProperty deviceProperty)
+	{
+		var sanitizedName = deviceProperty.Name.SanitizeFunctionName();
 		
+		var stringBuilder = new StringBuilder();
+
+		if (!string.IsNullOrWhiteSpace(deviceProperty.Description))
+		{
+			stringBuilder.AppendLine($@"/// <summary>
+/// {deviceProperty.Description.Replace("\n", "\n /// ")}
+/// </summary>");
+		}
+		stringBuilder.AppendLine($"[JsonProperty(\"{deviceProperty.Name}\")]");
+
+		if (deviceProperty is NumericValue numericValue)
+		{
+			stringBuilder.Append($"public int? {sanitizedName} {{ get; set; }}");
+			return stringBuilder.ToString();
+		}
+
+		if (deviceProperty is not EnumValue enumValue)
+		{
+			Console.WriteLine("Unknown device property type: " + deviceProperty.GetType().Name);
+			return null;
+		}
+		
+		// Property is EnumValue
+		var enumName = sanitizedName + "Enum";
+		stringBuilder.AppendLine($"public {enumName}? {sanitizedName} {{ get; set; }}\n");
+		stringBuilder.Append(GenerateEnum(enumName, enumValue.Values));
+
+		return stringBuilder.ToString();
+	}
+
+	private static string GenerateEnum(string enumName, IEnumerable<string> values)
+	{
+		var stringBuilder = new StringBuilder();
+		stringBuilder.AppendLine($"public enum {enumName}");
+		stringBuilder.AppendLine("{");
+		foreach (var value in values)
+		{
+			var valueEnumName = value.SanitizeFunctionName();
+			valueEnumName = valueEnumName.IsAllCaps() ? valueEnumName.CapitalizeFirstLetterOnly() : valueEnumName;
+			
+			stringBuilder.AppendLine($"\t[EnumMember(Value = \"{value}\")]");
+			stringBuilder.AppendLine($"\t{valueEnumName},");
+		}
+		stringBuilder.AppendLine("}");
+
+		return stringBuilder.ToString();
+	}
+
+	private static string GenerateDeviceReadState(Device device)
+	{
+		return $@"
+public class DeviceReadState
+{{
+	{device.SettableValues.Concat(device.OutputValues).Select(DevicePropertyToClassProperty).ConcatStrings().Indent(1)}
+}}";
 	}
 }

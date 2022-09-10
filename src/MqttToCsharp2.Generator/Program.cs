@@ -15,7 +15,7 @@ await File.WriteAllTextAsync(Path.Combine(outputDir, "mqtt-devices.json"), JsonC
 
 Console.WriteLine("Parsing devices");
 var devices = DevicesFactory.ParseDevices(devicesJson);
-await File.WriteAllTextAsync(Path.Combine(outputDir, "parsed-devices.json"), JsonConvert.SerializeObject(devices, Formatting.Indented));
+await File.WriteAllTextAsync(Path.Combine(outputDir, "parsed-devices.json"), JsonConvert.SerializeObject(devices, Formatting.Indented, new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto}));
 
 
 Console.WriteLine("Generating code");
